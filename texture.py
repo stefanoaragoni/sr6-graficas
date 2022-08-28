@@ -29,13 +29,7 @@ class Texture:
                     r = ord(image.read(1))
                     self.pixels[y].append(color(r,g,b))
 
-    def get_color(self, tx, ty):
-        x = int(tx * self.width)
-        y = int(ty * self.height)
-
-        return self.pixels[y][x]
-
-    def get_color_with_intensity(self, tx, ty, intensity=1):
+    def get_color(self, tx, ty, intensity=1):
         x = int(tx * self.width)
         y = int(ty * self.height)
 

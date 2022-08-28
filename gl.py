@@ -5,7 +5,6 @@
 
 from logging import raiseExceptions
 import struct
-import numpy as np
 from collections import namedtuple
 from texture import *
 
@@ -25,7 +24,6 @@ def color(r, g, b):
 
 # ========== VECTOR =========
 V3 = namedtuple('P3', ['x', 'y', 'z'])
-
 
 def sum(v0, v1):
   return V3(v0.x + v1.x, v0.y + v1.y, v0.z + v1.z)
@@ -254,7 +252,7 @@ class Render(object):
           tx = (tA.x * w) + (tB.x * v) + (tC.x * u)
           ty = (tA.y * w) + (tB.y * v) + (tC.y * u)
           
-          self.current_color = texture.get_color_with_intensity(tx, ty, intensity)
+          self.current_color = texture.get_color(tx, ty, intensity)
 
         z = (v1.z * w) + (v2.z * v) + (v3.z * u)
 
