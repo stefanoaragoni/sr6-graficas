@@ -5,6 +5,7 @@
 
 from logging import raiseExceptions
 import struct
+import numpy as np
 from collections import namedtuple
 from texture import *
 
@@ -24,6 +25,7 @@ def color(r, g, b):
 
 # ========== VECTOR =========
 V3 = namedtuple('P3', ['x', 'y', 'z'])
+
 
 def sum(v0, v1):
   return V3(v0.x + v1.x, v0.y + v1.y, v0.z + v1.z)
@@ -374,6 +376,9 @@ class Obj(object):
           for tempValue in temp:
             tempArray.append((float(tempValue)))
 
+          if(len(tempArray)==2):
+            tempArray.append(0)
+            
           self.tvertex.append(tempArray)
 
           
