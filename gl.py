@@ -142,7 +142,19 @@ class Render(object):
     second = mult(transition_matrix,rotation_matrix)
     self.Model = mult(second,scale_matrix)
 
-  
+  def loadViewMatrix(self, x, y, z, center):
+    assert False, (x, y, z, center)
+
+  def lookAt(self, eye, center, up):
+    eye = V3(*eye)
+    center = V3(*center)
+    up = V3(*up)
+
+    z = norm(sub(eye,center))
+    x = norm(cross(up, z))
+    y = norm(cross(z * x))
+
+    self.loadViewMatrix(x, y, z, center)
 
   def glCreateWindow(self, width=100, height=100):
     self.width = width
@@ -202,7 +214,10 @@ class Render(object):
 
     for y in range(self.height-1, -1, -1):
       for x in range(self.width):
-        f.write(self.pixels[x][y])
+        try:
+          f.write(self.pixels[x][y])
+        except:
+          f.write(BLACK)
 
     f.close()
 
@@ -308,7 +323,6 @@ class Render(object):
           tA, tB, tC = texture_coords
           tx = (tA.x * w) + (tB.x * v) + (tC.x * u)
           ty = (tA.y * w) + (tB.y * v) + (tC.y * u)
-          
           self.current_color = texture.get_color_with_intensity(tx, ty, intensity)
 
         z = (v1.z * w) + (v2.z * v) + (v3.z * u)
@@ -360,10 +374,10 @@ class Render(object):
         normal = norm(cross(sub(v2, v1), sub(v3, v1)))
         intensity = dot(normal, light)
 
-        if not texture:
-          if intensity < 0:
-            continue  
+        if intensity < 0:
+          continue  
 
+        if not texture:
           self.triangle(v1, v2, v3, color(intensity, intensity, intensity))
 
         else:
@@ -391,10 +405,10 @@ class Render(object):
         normal = norm(cross(sub(v1, v2), sub(v2, v3)))
         intensity = dot(normal, light)
 
-        if not texture:
-          if intensity < 0:
-            continue  
+        if intensity < 0:
+          continue  
 
+        if not texture:
           self.triangle(v1, v3, v2, color(intensity, intensity, intensity))
           self.triangle(v1, v4, v3, color(intensity, intensity, intensity))
           
