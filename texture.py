@@ -1,7 +1,7 @@
 import struct 
 from gl import *
 
-def color(r, g, b):
+def color(b, g, r):
   return bytes([b, g, r])
 
 class Texture:
@@ -27,21 +27,36 @@ class Texture:
                     b = ord(image.read(1))
                     g = ord(image.read(1))
                     r = ord(image.read(1))
-                    self.pixels[y].append(color(r,g,b))
+                    self.pixels[y].append(color(b,g,r))
 
-    def get_color(self, tx, ty, intensity=1):
+    def get_color(self, tx, ty):
+        x = int(tx * self.width)
+        y = int(ty * self.height)
+        
+        return self.pixels[y][x]
+
+    def get_color_with_intensity(self, tx, ty, intensity=1):
         x = int(tx * self.width)
         y = int(ty * self.height)
 
-        b = round(self.pixels[y][x][0]*intensity)
-        g = round(self.pixels[y][x][1]*intensity)
-        r = round(self.pixels[y][x][2]*intensity)
-
         try:
-            if intensity > 0:
-                return color(r,g,b)
-            else:
-                return self.pixels[y][x]
+            int_values = [temp for temp in (self.pixels[y][x])]
+
+            b = round(int_values[0] * intensity)
+            g = round(int_values[1] * intensity)
+            r = round(int_values[2] * intensity)
+
+            if(r<0):
+                r = 0
+
+            if(g<0):
+                g = 0
+
+            if(b<0):
+                b = 0
+
+            return color(b,g,r)
+        
         except:
             pass
         
