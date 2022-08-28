@@ -6,6 +6,7 @@
 from logging import raiseExceptions
 from collections import namedtuple
 import struct
+from math import *
 
 from texture import *
 from obj import *
@@ -91,6 +92,57 @@ class Render(object):
     self.current_color = BLACK
     self.background_color = WHITE
     self.Model = None
+
+  def loadModelMatrix(self, translate=(0,0,0), scale=(1,1,1), rotate=(0,0,0)):
+    translate = V3(*translate)
+    scale = V3(*scale)
+    rotate = V3(*rotate)
+
+    transition_matrix = [
+      [1, 0, 0, translate.x],
+      [0, 1, 0, translate.y],
+      [0, 0, 1, translate.z],
+      [0, 0, 0, 1]
+    ]
+
+    scale_matrix = [
+      [scale.x, 0, 0, 0],
+      [0, scale.y, 0, 0],
+      [0, 0, scale.z, 0],
+      [0, 0, 0, 1]
+    ]
+
+    a = rotate.x
+    rotation_x = [
+      [1, 0, 0, 0],
+      [0, cos(a), -sin(a), 0],
+      [0, sin(a), cos(a), 0],
+      [0, 0, 0, 1]
+    ]
+
+    a = rotate.y
+    rotation_y = [
+      [cos(a), 0, sin(a), 0],
+      [0, 1, 0, 0],
+      [-sin(a), 0,  cos(a), 0],
+      [0, 0, 0, 1]
+    ]
+
+    a = rotate.z
+    rotation_z = [
+      [cos(a), -sin(a), 0, 0],
+      [sin(a), cos(a), 0, 0],
+      [0, 0, 1, 0],
+      [0, 0, 0, 1]
+    ]
+
+    first = mult(rotation_x,rotation_y)
+    rotation_matrix = mult(first,rotation_z)
+
+    second = mult(transition_matrix,rotation_matrix)
+    self.Model = mult(second,scale_matrix)
+
+  
 
   def glCreateWindow(self, width=100, height=100):
     self.width = width
@@ -270,16 +322,28 @@ class Render(object):
           self.zbuffer[tempx][tempy] = z
           self.glVertex(x_temp, y_temp)
 
-  def transform_vertex(self, vertex, scale, translate):
+  def transform_vertex(self, vertex):
+    augmented_vertex = [
+      vertex[0],
+      vertex[1],
+      vertex[2],
+      1
+    ]
+
+    transformed_vertex = multmv(self.Model, augmented_vertex)
+
     return V3(
-      round((vertex[0] + translate[0]) * scale[0]),
-      round((vertex[1] + translate[1]) * scale[1]),
-      round((vertex[2] + translate[2]) * scale[2]),
+      round(transformed_vertex[0] / transformed_vertex[3]),
+      round(transformed_vertex[1] / transformed_vertex[3]),
+      round(transformed_vertex[2] / transformed_vertex[3]),
     )
+
     
-  def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1), texture=None):
+  def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1), rotate=(0,0,0), texture=None):
     archivo = Obj(filename)
     light = V3(0,0,1)
+
+    self.loadModelMatrix(translate, scale, rotate)
     
     for face in archivo.faces:
       vcount = len(face)
@@ -289,9 +353,9 @@ class Render(object):
         f2 = face[1][0] - 1
         f3 = face[2][0] - 1
 
-        v1 = self.transform_vertex(archivo.vertex[f1], scale, translate)
-        v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
-        v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
+        v1 = self.transform_vertex(archivo.vertex[f1])
+        v2 = self.transform_vertex(archivo.vertex[f2])
+        v3 = self.transform_vertex(archivo.vertex[f3])
 
         normal = norm(cross(sub(v2, v1), sub(v3, v1)))
         intensity = dot(normal, light)
@@ -319,10 +383,10 @@ class Render(object):
         f3 = face[2][0] - 1
         f4 = face[3][0] - 1
 
-        v1 = self.transform_vertex(archivo.vertex[f1], scale, translate)
-        v2 = self.transform_vertex(archivo.vertex[f2], scale, translate)
-        v3 = self.transform_vertex(archivo.vertex[f3], scale, translate)
-        v4 = self.transform_vertex(archivo.vertex[f4], scale, translate)
+        v1 = self.transform_vertex(archivo.vertex[f1])
+        v2 = self.transform_vertex(archivo.vertex[f2])
+        v3 = self.transform_vertex(archivo.vertex[f3])
+        v4 = self.transform_vertex(archivo.vertex[f4])
 
         normal = norm(cross(sub(v1, v2), sub(v2, v3)))
         intensity = dot(normal, light)
