@@ -143,7 +143,40 @@ class Render(object):
     self.Model = mult(second,scale_matrix)
 
   def loadViewMatrix(self, x, y, z, center):
-    assert False, (x, y, z, center)
+    Mi = [
+      [x.x, x.y, x.z, 0],
+      [y.x, y.y, y.z, 0],
+      [z.x, z.y, z.z, 0],
+      [0, 0, 0, 1]
+    ]
+
+    Op = [
+      [1, 0, 0, -center.x],
+      [0, 1, 0, -center.y],
+      [0, 0, 1, -center.z],
+      [0, 0, 0, 1]
+    ]
+
+    self.View = mult(Mi, Op)
+
+  def loadProjectionMatrix(self, coeff):
+    self.Projection = [
+      [1, 0, 0, 0],
+      [0, 1, 0, 0],
+      [0, 0, 1, 0],
+      [0, 0, -0.001, 1]
+    ]
+
+  def loadViewportMatrix(self):
+    w = self.width/2
+    h = self.height/2
+
+    self.Viewport = [
+      [w, 0, 0, w],
+      [0, h, 0, h],
+      [0, 0, 128, 128],
+      [0, 0, 0, 1]
+    ]
 
   def lookAt(self, eye, center, up):
     eye = V3(*eye)
@@ -152,9 +185,11 @@ class Render(object):
 
     z = norm(sub(eye,center))
     x = norm(cross(up, z))
-    y = norm(cross(z * x))
+    y = norm(cross(z, x))
 
     self.loadViewMatrix(x, y, z, center)
+    self.loadProjectionMatrix(-1 / length(sub(eye, center)))
+    self.loadViewportMatrix()
 
   def glCreateWindow(self, width=100, height=100):
     self.width = width
@@ -254,9 +289,6 @@ class Render(object):
     f.close()
 
   def glVertex(self, x, y):
-    if not (-1 <= x <= 1) or not (-1 <= y <= 1):
-      raise Exception('Coordenada invalida. Ingrese valores entre -1 y 1.')
-
     try:
       X0 = int(self.x2 + (self.width2/2) + (x * self.width2/2))
       Y0 = int(self.y2 + (self.height2/2) + (-y * self.height2/2))
@@ -332,9 +364,12 @@ class Render(object):
         tempx = int(self.x2 + (self.width2/2) + (x_temp * self.width2/2))
         tempy = int(self.y2 + (self.height2/2) + (-y_temp * self.height2/2))
       
-        if z > self.zbuffer[tempx][tempy]:
-          self.zbuffer[tempx][tempy] = z
-          self.glVertex(x_temp, y_temp)
+        try:
+          if tempx >= 0 and tempy >= 0 and z > self.zbuffer[tempx][tempy]:
+            self.zbuffer[tempx][tempy] = z
+            self.glVertex(x_temp, y_temp)
+        except:
+          pass
 
   def transform_vertex(self, vertex):
     augmented_vertex = [
@@ -344,7 +379,10 @@ class Render(object):
       1
     ]
 
-    transformed_vertex = multmv(self.Model, augmented_vertex)
+    matrix1 = multmv(self.Model, augmented_vertex)
+    matrix2 = multmv(self.View, matrix1)
+    matrix3 = multmv(self.Projection, matrix2)
+    transformed_vertex = multmv(self.Viewport, matrix3)
 
     return V3(
       round(transformed_vertex[0] / transformed_vertex[3]),
