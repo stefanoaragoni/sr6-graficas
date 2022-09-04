@@ -168,8 +168,8 @@ class Render(object):
     ]
 
   def loadViewportMatrix(self):
-    w = self.width/2
-    h = self.height/2
+    w = self.width2/4
+    h = self.height2/4
 
     self.Viewport = [
       [w, 0, 0, w],
