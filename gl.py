@@ -93,6 +93,12 @@ class Render(object):
     self.background_color = WHITE
     self.Model = None
 
+    self.vertex_buffer_object = []
+    self.active_vertex_array = []
+    self.active_texture = None
+    self.active_shader = None
+    self.light = V3(0,0,1)
+
   def loadModelMatrix(self, translate=(0,0,0), scale=(1,1,1), rotate=(0,0,0)):
     translate = V3(*translate)
     scale = V3(*scale)
@@ -338,36 +344,93 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def triangle(self, v1, v2, v3, color_ = None, texture=None, texture_coords=(), intensity=1):
+  def shader(render, **kwargs):
+    w, u, v = kwargs['bar']
+    L = kwargs['light']
+    A, B, C = kwargs['vertices']
+    tA, tB, tC = kwargs['texture_coords']
+    nA, nB, nC = kwargs['normals']
 
-    min, max = bounding_box([v1.x, v2.x, v3.x],[v1.y, v2.y, v3.y])
+    iA = mult(norm(nA),norm(L))
+    iB = mult(norm(nB),norm(L))
+    iC = mult(norm(nC),norm(L))
+
+    i = iA * w + iB * u + iC * v
+
+    if render.active_texture:
+        tx = tA.x * w + tB.x * u + tC.x * v
+        ty = tA.y * w + tB.y * u + tC.y * v
+
+        return render.active_texture.get_color_with_intensity(tx, ty, i)
+  
+  def triangle(self):
+    A = next(self.active_vertex_array)
+    B = next(self.active_vertex_array)
+    C = next(self.active_vertex_array)
+
+    if self.active_texture:
+        tA = next(self.active_vertex_array)
+        tB = next(self.active_vertex_array)
+        tC = next(self.active_vertex_array)
+        
+    if self.active_shader:
+        nA = next(self.active_vertex_array)
+        nB = next(self.active_vertex_array)
+        nC = next(self.active_vertex_array)
+
+    L = self.light
+    N = mul(sub(B, A), sub(C, A))
+    i = cross(norm(N), norm(L))
+
+    if i < 0:
+      return
+    if i > 1:
+      i = 1
+
+    self.current_color = color(i, i, i)
+
+  ############################# CALCULOS #############################
+
+    min, max = bounding_box([A.x, B.x, C.x],[A.y, B.y, C.y])
 
     for x in range(min.x, max.x+1):
       for y in range(min.y, max.y+1):
-        w, v, u = barycentric(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, x, y)
+        w, v, u = barycentric(A.x, A.y, B.x, B.y, C.x, C.y, x, y)
 
         if w < 0 or v < 0 or u < 0: 
           continue
 
-        self.current_color = color_
-
-        if texture:
-          tA, tB, tC = texture_coords
-          tx = (tA.x * w) + (tB.x * v) + (tC.x * u)
-          ty = (tA.y * w) + (tB.y * v) + (tC.y * u)
-          self.current_color = texture.get_color_with_intensity(tx, ty, intensity)
-
-        z = (v1.z * w) + (v2.z * v) + (v3.z * u)
+        z = (A.z * w) + (B.z * v) + (C.z * u)
 
         x_temp, y_temp = x/self.width, y/self.height
         
         tempx = int(self.x2 + (self.width2/2) + (x_temp * self.width2/2))
         tempy = int(self.y2 + (self.height2/2) + (-y_temp * self.height2/2))
       
+        ############################# DIBUJO #############################
         try:
-          if tempx >= 0 and tempy >= 0 and z > self.zbuffer[tempx][tempy]:
+          if (
+            tempx >= 0 and
+            tempy >= 0 and
+            tempx < len(self.zbuffer) and  
+            tempy < len(self.zbuffer[0]) and 
+            z > self.zbuffer[tempx][tempy]):
+          
             self.zbuffer[tempx][tempy] = z
-            self.glVertex(x_temp, y_temp)
+
+            
+
+            if(self.active_shader):
+              self.current_color = self.active_shader(self, x, y, self.current_color)
+
+            else:
+              if texture:
+                tA, tB, tC = texture_coords
+                tx = (tA.x * w) + (tB.x * v) + (tC.x * u)
+                ty = (tA.y * w) + (tB.y * v) + (tC.y * u)
+                self.current_color = texture.get_color_with_intensity(tx, ty, intensity)
+              
+                self.glVertex(x_temp, y_temp)
         except:
           pass
 
@@ -463,3 +526,17 @@ class Render(object):
           
           self.triangle(v1, v3, v2, texture=texture, texture_coords=(t1, t3, t2), intensity=intensity)
           self.triangle(v1, v4, v3, texture=texture, texture_coords=(t1, t4, t3), intensity=intensity)
+
+  def draw(self,polygon):
+    if polygon == 'TRIANGLES':
+        try:
+            while True:
+                self.triangle() #TODO
+        except StopIteration:
+            print("terminado")
+    if polygon == 'WIREFRAME':
+        try:
+            while True:
+                self.wireframe() #TODO
+        except StopIteration:
+            print("terminado")

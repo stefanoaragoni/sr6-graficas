@@ -6,6 +6,7 @@ class Obj(object):
     self.vertex = []  #v
     self.faces = [] #f
     self.tvertex = [] #tv
+    self.nvertex = [] #vn
 
     for line in self.lines:
       line = line.strip()
@@ -32,6 +33,18 @@ class Obj(object):
             tempArray.append(0)
             
           self.tvertex.append(tempArray)
+
+        elif prefix == 'vn':
+          temp = value.split(' ')
+          tempArray = []
+
+          for tempValue in temp:
+            tempArray.append((float(tempValue)))
+
+          if(len(tempArray)==2):
+            tempArray.append(0)
+            
+          self.nvertex.append(tempArray)
 
           
         elif prefix == 'f':
