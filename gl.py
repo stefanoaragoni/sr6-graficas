@@ -344,24 +344,24 @@ class Render(object):
       #incrementa X conforme pasitos proporcionales
       x += self.inc
 
-  def shader(render, **kwargs):
+  def shader(self, **kwargs):
     w, u, v = kwargs['bar']
     L = kwargs['light']
     A, B, C = kwargs['vertices']
     tA, tB, tC = kwargs['texture_coords']
     nA, nB, nC = kwargs['normals']
 
-    iA = mult(norm(nA),norm(L))
-    iB = mult(norm(nB),norm(L))
-    iC = mult(norm(nC),norm(L))
+    iA = dot(norm(nA),norm(L))
+    iB = dot(norm(nB),norm(L))
+    iC = dot(norm(nC),norm(L))
 
-    i = iA * w + iB * u + iC * v
+    i = iA * w + iB * u + iC * v  
 
-    if render.active_texture:
+    if self.active_texture:
         tx = tA.x * w + tB.x * u + tC.x * v
         ty = tA.y * w + tB.y * u + tC.y * v
 
-        return render.active_texture.get_color_with_intensity(tx, ty, i)
+        return self.active_texture.get_color_with_intensity(tx, ty, i)
   
   def triangle(self):
     A = next(self.active_vertex_array)
@@ -369,25 +369,14 @@ class Render(object):
     C = next(self.active_vertex_array)
 
     if self.active_texture:
-        tA = next(self.active_vertex_array)
         tB = next(self.active_vertex_array)
+        tA = next(self.active_vertex_array)
         tC = next(self.active_vertex_array)
         
     if self.active_shader:
-        nA = next(self.active_vertex_array)
         nB = next(self.active_vertex_array)
+        nA = next(self.active_vertex_array)
         nC = next(self.active_vertex_array)
-
-    L = self.light
-    N = mul(sub(B, A), sub(C, A))
-    i = cross(norm(N), norm(L))
-
-    if i < 0:
-      return
-    if i > 1:
-      i = 1
-
-    self.current_color = color(i, i, i)
 
   ############################# CALCULOS #############################
 
@@ -409,30 +398,35 @@ class Render(object):
       
         ############################# DIBUJO #############################
         try:
-          if (
-            tempx >= 0 and
-            tempy >= 0 and
-            tempx < len(self.zbuffer) and  
-            tempy < len(self.zbuffer[0]) and 
-            z > self.zbuffer[tempx][tempy]):
+          if tempx >= 0 and tempy >= 0 and z > self.zbuffer[tempx][tempy]:
           
             self.zbuffer[tempx][tempy] = z
 
-            
-
-            if(self.active_shader):
-              self.current_color = self.active_shader(self, x, y, self.current_color)
-
-            else:
-              if texture:
-                tA, tB, tC = texture_coords
-                tx = (tA.x * w) + (tB.x * v) + (tC.x * u)
-                ty = (tA.y * w) + (tB.y * v) + (tC.y * u)
-                self.current_color = texture.get_color_with_intensity(tx, ty, intensity)
-              
-                self.glVertex(x_temp, y_temp)
+            self.current_color = self.active_shader(
+              bar = (w,u,v),
+              vertices=(A,B,C),
+              texture_coords = (tA,tB,tC),
+              normals = (nA,nB,nC),
+              light = self.light
+            )
+            self.glVertex(x_temp,y_temp)
         except:
           pass
+
+
+  def wireframe(self):
+    A = next(self.active_vertex_array)
+    B = next(self.active_vertex_array)
+    C = next(self.active_vertex_array)
+
+    if self.active_texture:
+      tA = next(self.active_vertex_array)
+      tB = next(self.active_vertex_array)
+      tC = next(self.active_vertex_array)
+    
+    self.glLine(A.x, A.y,B.x, B.y)
+    self.glLine(B.x, B.y,C.x, C.y)
+    self.glLine(C.x, C.y,A.x, A.y)
 
   def transform_vertex(self, vertex):
     augmented_vertex = [
@@ -453,15 +447,18 @@ class Render(object):
       round(transformed_vertex[2] / transformed_vertex[3]),
     )
 
-    
   def glLoad(self, filename, translate=(0,0,0), scale=(1,1,1), rotate=(0,0,0), texture=None):
     archivo = Obj(filename)
-    light = V3(0,0,1)
+    light = self.light
 
     self.loadModelMatrix(translate, scale, rotate)
-    
+     
+    ############################# FOR #############################
+
     for face in archivo.faces:
       vcount = len(face)
+
+      ############################# VCOUNT 3 #############################
 
       if vcount == 3:
         f1 = face[0][0] - 1
@@ -472,26 +469,40 @@ class Render(object):
         v2 = self.transform_vertex(archivo.vertex[f2])
         v3 = self.transform_vertex(archivo.vertex[f3])
 
-        normal = norm(cross(sub(v2, v1), sub(v3, v1)))
-        intensity = dot(normal, light)
+        self.vertex_buffer_object.append(v1)
+        self.vertex_buffer_object.append(v2)
+        self.vertex_buffer_object.append(v3)
 
-        if intensity < 0:
-          continue  
+        if self.active_texture:
+          ft1 = face[0][1] - 1
+          ft2 = face[1][1] - 1
+          ft3 = face[2][1] - 1
 
-        if not texture:
-          self.triangle(v1, v2, v3, color(intensity, intensity, intensity))
+          vt1 = V3(*archivo.tvertex[ft1])
+          vt2 = V3(*archivo.tvertex[ft2])
+          vt3 = V3(*archivo.tvertex[ft3])
 
-        else:
-          f12 = face[0][1] - 1
-          f22 = face[1][1] - 1
-          f32 = face[2][1] - 1
+          self.vertex_buffer_object.append(vt1)
+          self.vertex_buffer_object.append(vt2)
+          self.vertex_buffer_object.append(vt3)
+
+        try:
+          fn1 = face[0][2] - 1
+          fn2 = face[1][2] - 1
+          fn3 = face[2][2] - 1
+
+          vn1 = V3(*archivo.nvertex[fn1])
+          vn2 = V3(*archivo.nvertex[fn2])
+          vn3 = V3(*archivo.nvertex[fn3])
+      
+          self.vertex_buffer_object.append(vn1)
+          self.vertex_buffer_object.append(vn2)
+          self.vertex_buffer_object.append(vn3)
+        except:
+          pass
           
-          t1 = V3(*archivo.tvertex[f12])
-          t2 = V3(*archivo.tvertex[f22])
-          t3 = V3(*archivo.tvertex[f32])
+      ############################# VCOUNT 4 #############################
 
-          self.triangle(v2, v1, v3, texture=texture, texture_coords=(t1, t3, t2), intensity=intensity)
-          
       if vcount == 4:
         f1 = face[0][0] - 1
         f2 = face[1][0] - 1
@@ -502,41 +513,85 @@ class Render(object):
         v2 = self.transform_vertex(archivo.vertex[f2])
         v3 = self.transform_vertex(archivo.vertex[f3])
         v4 = self.transform_vertex(archivo.vertex[f4])
+        
+        self.vertex_buffer_object.append(v1)
+        self.vertex_buffer_object.append(v2)
+        self.vertex_buffer_object.append(v3)
+        
+        if self.active_texture:
 
-        normal = norm(cross(sub(v1, v2), sub(v2, v3)))
-        intensity = dot(normal, light)
+            ft1 = face[0][1] - 1
+            ft2 = face[1][1] - 1
+            ft3 = face[2][1] - 1
 
-        if intensity < 0:
-          continue  
+            vt1 = V3(*archivo.tvertex[ft1])
+            vt2 = V3(*archivo.tvertex[ft2])
+            vt3 = V3(*archivo.tvertex[ft3])
 
-        if not texture:
-          self.triangle(v1, v3, v2, color(intensity, intensity, intensity))
-          self.triangle(v1, v4, v3, color(intensity, intensity, intensity))
-          
-        else:
-          f12 = face[0][1] - 1
-          f22 = face[1][1] - 1
-          f32 = face[2][1] - 1
-          f42 = face[3][1] - 1
+            self.vertex_buffer_object.append(vt1)
+            self.vertex_buffer_object.append(vt2)
+            self.vertex_buffer_object.append(vt3)
 
-          t1 = V3(*archivo.tvertex[f12])
-          t2 = V3(*archivo.tvertex[f22])
-          t3 = V3(*archivo.tvertex[f32])
-          t4 = V3(*archivo.tvertex[f42])
-          
-          self.triangle(v1, v3, v2, texture=texture, texture_coords=(t1, t3, t2), intensity=intensity)
-          self.triangle(v1, v4, v3, texture=texture, texture_coords=(t1, t4, t3), intensity=intensity)
+        try:
+            fn1 = face[0][2] - 1
+            fn2 = face[1][2] - 1
+            fn3 = face[2][2] - 1
+
+            vn1 = V3(*archivo.nvertex[fn1])
+            vn2 = V3(*archivo.nvertex[fn2])
+            vn3 = V3(*archivo.nvertex[fn3])
+        
+            self.vertex_buffer_object.append(vn1)
+            self.vertex_buffer_object.append(vn2)
+            self.vertex_buffer_object.append(vn3)
+        except:
+            pass
+
+        self.vertex_buffer_object.append(v1)
+        self.vertex_buffer_object.append(v3)
+        self.vertex_buffer_object.append(v4)
+
+        if self.active_texture:
+
+            ft1 = face[0][1] - 1
+            ft3 = face[2][1] - 1
+            ft4 = face[3][1] - 1
+
+            vt1 = V3(*archivo.tvertex[ft1])
+            vt3 = V3(*archivo.tvertex[ft3])
+            vt4 = V3(*archivo.tvertex[ft4])
+
+            self.vertex_buffer_object.append(vt1)
+            self.vertex_buffer_object.append(vt3)
+            self.vertex_buffer_object.append(vt4)
+        try:
+            fn1 = face[0][2] - 1
+            fn3 = face[2][2] - 1
+            fn4 = face[3][2] - 1
+
+            vn1 = V3(*archivo.nvertex[fn1])
+            vn3 = V3(*archivo.nvertex[fn3])
+            vn4 = V3(*archivo.nvertex[fn4])
+        
+            self.vertex_buffer_object.append(vn1)
+            self.vertex_buffer_object.append(vn3)
+            self.vertex_buffer_object.append(vn4)
+        except:
+            pass
+
+
+    self.active_vertex_array = iter(self.vertex_buffer_object)
 
   def draw(self,polygon):
     if polygon == 'TRIANGLES':
         try:
             while True:
-                self.triangle() #TODO
+                self.triangle()
         except StopIteration:
             print("terminado")
     if polygon == 'WIREFRAME':
         try:
             while True:
-                self.wireframe() #TODO
+                self.wireframe()
         except StopIteration:
             print("terminado")
